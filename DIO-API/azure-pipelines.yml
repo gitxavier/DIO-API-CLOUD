@@ -1,0 +1,45 @@
+trigger:
+- main
+
+pool:
+  name: Default  # Nome do seu pool no agente auto-hospedado
+
+variables:
+  solution: '$(Build.SourcesDirectory)/APITempoDIO/APITempoDIO.sln'
+  buildPlatform: 'AnyCPU'
+  buildConfiguration: 'Release'
+
+steps:
+- checkout: self
+  clean: true
+  persistCredentials: true
+
+- script: dir /s /b $(Build.SourcesDirectory)
+  displayName: 'Listar arquivos no agente'
+
+- task: UseDotNet@2
+  displayName: "Install .NET SDK"
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+- script: dotnet restore "$(solution)"
+  displayName: 'Restore Solution'
+
+- script: dotnet build "$(solution)" --configuration "$(buildConfiguration)"
+  displayName: 'Build Solution'
+
+- script: dotnet test "$(solution)" --configuration "$(buildConfiguration)" --no-build --collect:"XPlat Code Coverage"
+  displayName: 'Run Tests'
+
+- script: docker --version
+  displayName: 'Verificar versão do Docker'
+
+- task: Docker@2
+  inputs:
+    containerRegistry: 'acrapigxsales'
+    repository: 'api-dio-test'
+    command: 'buildAndPush'
+    Dockerfile: '$(Build.SourcesDirectory)/APITempoDIO/Dockerfile'
+    buildContext: '$(Build.SourcesDirectory)/APITempoDIO'
+    arguments: '--build-arg BUILD_CONFIGURATION=$(buildConfiguration)'
